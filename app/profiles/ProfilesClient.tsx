@@ -1,7 +1,10 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { selectProfileAction, addMemberAction, deleteMemberAction, editMemberAction } from "../actions";
+import { useToast } from "../components/Toast";
+import ConfirmModal from "../components/ConfirmModal";
 
 interface Member {
   id: string;
@@ -30,6 +33,12 @@ export default function ProfilesClient({
   initialMembers,
 }: ProfilesClientProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
+  
+  // Sync state with server prop in case of external router.refresh()
+  useEffect(() => {
+    setMembers(initialMembers);
+  }, [initialMembers]);
+  
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,6 +58,16 @@ export default function ProfilesClient({
   const [editMemberName, setEditMemberName] = useState("");
   const [editMemberPin, setEditMemberPin] = useState("");
   const [editMemberOldPin, setEditMemberOldPin] = useState("");
+
+  const router = useRouter();
+  const { toast } = useToast();
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning";
+  } | null>(null);
 
   const handleSelectProfile = (id: string, pin?: string) => {
     setSelectedId(id);
@@ -74,17 +93,26 @@ export default function ProfilesClient({
 
   const handleDeleteProfile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this profile? This will also remove all their active chores.")) return;
     
-    startTransition(async () => {
-      // If we're deleting from the edit modal, pass the oldPin to authorize it
-      const pinToPass = id === editMemberId ? editMemberOldPin : undefined;
-      const res = await deleteMemberAction(id, pinToPass);
-      if (res?.error) {
-        setError(res.error);
-      } else {
-        setMembers(members.filter(m => m.id !== id));
-        setShowEditModal(false);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Profile",
+      message: "Are you sure you want to delete this profile? This will also remove all their active chores.",
+      variant: "danger",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        startTransition(async () => {
+          // If we're deleting from the edit modal, pass the oldPin to authorize it
+          const pinToPass = id === editMemberId ? editMemberOldPin : undefined;
+          const res = await deleteMemberAction(id, pinToPass);
+          if (res?.error) {
+            setError(res.error);
+          } else {
+            toast("Profile deleted.", "success");
+            setMembers(members.filter(m => m.id !== id));
+            setShowEditModal(false);
+          }
+        });
       }
     });
   };
@@ -100,9 +128,14 @@ export default function ProfilesClient({
         setError(res.error);
         return;
       }
-      
-      // Refresh window to get server-side UUIDs
-      window.location.reload();
+      // Optimistic update
+      const tempId = "temp-" + Date.now();
+      setMembers([...members, { id: tempId, name: newMemberName }]);
+      toast("Member added successfully.", "success");
+      setShowAddModal(false);
+      setNewMemberName("");
+      // Refresh router to get server-side UUIDs
+      router.refresh();
     } catch {
       setError("An error occurred while creating flat member.");
     }
@@ -135,6 +168,7 @@ export default function ProfilesClient({
         return;
       }
       
+      toast("Profile updated.", "success");
       setMembers(members.map(m => m.id === editMemberId ? { ...m, name: editMemberName } : m));
       setShowEditModal(false);
     } catch {
@@ -154,7 +188,7 @@ export default function ProfilesClient({
         </p>
 
         {/* Profile List */}
-        <div className="flex flex-wrap justify-center gap-8 md:gap-14 mb-16">
+        <div className="flex flex-wrap justify-center gap-8 md:gap-14 mb-16 relative">
           {members.map((member, index) => {
             const initials = member.name.substring(0, 2).toUpperCase();
             const isActive = selectedId === member.id;
@@ -169,8 +203,12 @@ export default function ProfilesClient({
                     handleSelectProfile(member.id);
                   }
                 }}
-                disabled={isPending}
-                className="group flex flex-col items-center focus:outline-none disabled:opacity-50 relative"
+                disabled={isPending && !isActive}
+                className={`group flex flex-col items-center focus:outline-none relative transition-all duration-700 cubic-bezier(0.34, 1.56, 0.64, 1)
+                  ${isPending && isActive ? 'scale-125 z-50 opacity-100 drop-shadow-2xl translate-y-[-20px]' : ''}
+                  ${isPending && !isActive ? 'scale-75 opacity-0 pointer-events-none blur-sm' : ''}
+                  ${!isPending ? 'disabled:opacity-50 hover:-translate-y-1' : ''}
+                `}
               >
                 {/* Edit Badge (Pencil) */}
                 {isManaging && (
@@ -462,6 +500,18 @@ export default function ProfilesClient({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant={confirmDialog.variant}
+          isPending={isPending}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

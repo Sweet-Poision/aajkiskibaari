@@ -3,12 +3,14 @@
 import { useTransition, useState } from "react";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { loginAction, registerAction } from "../actions";
+import { useToast } from "../components/Toast";
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -154,20 +156,10 @@ export default function LoginPage() {
           </div>
 
           {activeTab === "login" && (
-            <div className="flex items-center justify-between text-xs">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-zinc-400 text-primary focus:ring-primary"
-                />
-                <span className="font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Remember this flat</span>
-              </label>
+            <div className="flex items-center justify-end text-xs">
               <button
                 type="button"
-                onClick={() => alert("Please contact your flat admin to reset the password.")}
+                onClick={() => toast("Please contact your flat admin to reset the password.", "info")}
                 className="font-black text-primary hover:text-primary-hover uppercase tracking-widest text-[10px] transition-colors"
               >
                 Forgot password?

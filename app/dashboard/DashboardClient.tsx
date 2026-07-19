@@ -1,6 +1,11 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { useToast } from "../components/Toast";
+import ConfirmModal from "../components/ConfirmModal";
+import StatsBar from "../components/StatsBar";
+import Scoreboard from "../components/Scoreboard";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import {
   switchProfileAction,
   logoutAction,
@@ -60,6 +65,7 @@ interface DashboardClientProps {
   initialChores: ChoreDefinition[];
   initialActiveChores: ActiveChore[];
   initialPresenceRequests: PresenceRequest[];
+  initialStats: any;
 }
 
 const AVATAR_COLORS = [
@@ -81,9 +87,20 @@ export default function DashboardClient({
   initialChores,
   initialActiveChores,
   initialPresenceRequests,
+  initialStats,
 }: DashboardClientProps) {
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'engine'>('overview');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning";
+  } | null>(null);
+
+  useAutoRefresh(30000); // 30s auto-refresh polling
 
   // Modals state
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -136,11 +153,11 @@ export default function DashboardClient({
     startTransition(async () => {
       const res = await togglePresenceAction(memberId, currentPresence);
       if (res?.error) {
-        alert(res.error);
+        toast(res.error, "error");
       } else if (res?.instantApproval) {
-        alert("Presence updated successfully!");
+        toast("Presence updated successfully!", "success");
       } else {
-        alert("Presence change request submitted! Other members must vote to approve.");
+        toast("Presence change request submitted! Other members must vote to approve.", "info");
       }
     });
   };
@@ -149,11 +166,11 @@ export default function DashboardClient({
     startTransition(async () => {
       const res = await votePresenceRequestAction(requestId);
       if (res?.error) {
-        alert(res.error);
+        toast(res.error, "error");
       } else if (res?.approved) {
-        alert("Status vote approved and presence updated!");
+        toast("Status vote approved and presence updated!", "success");
       } else {
-        alert("Vote registered successfully.");
+        toast("Vote registered successfully.", "success");
       }
     });
   };
@@ -161,28 +178,29 @@ export default function DashboardClient({
   const handleSubmitChore = async (choreId: string) => {
     startTransition(async () => {
       const res = await submitChoreAction(choreId);
-      if (res?.error) alert(res.error);
+      if (res?.error) toast(res.error, "error");
+      else toast("Chore submitted for verification.", "info");
     });
   };
 
   const handleApproveChore = async (choreId: string, assignedToId: string) => {
     startTransition(async () => {
       const res = await approveChoreAction(choreId, assignedToId);
-      if (res?.error) alert(res.error);
+      if (res?.error) toast(res.error, "error");
     });
   };
 
   const handleDisputeChore = async (choreId: string, assignedToId: string) => {
     startTransition(async () => {
       const res = await disputeChoreAction(choreId, assignedToId);
-      if (res?.error) alert(res.error);
+      if (res?.error) toast(res.error, "error");
     });
   };
 
   const handleMarkFailedChore = async (choreId: string, assignedToId: string) => {
     startTransition(async () => {
       const res = await markFailedChoreAction(choreId, assignedToId);
-      if (res?.error) alert(res.error);
+      if (res?.error) toast(res.error, "error");
     });
   };
 
@@ -191,15 +209,16 @@ export default function DashboardClient({
     if (!newMemberName.trim()) return;
     
     if (newMemberPin && newMemberPin.length !== 4) {
-      alert("PIN must be exactly 4 digits.");
+      toast("PIN must be exactly 4 digits.", "error");
       return;
     }
 
     startTransition(async () => {
       const res = await addMemberAction(newMemberName, newMemberPin || null);
       if (res?.error) {
-        alert(res.error);
+        toast(res.error, "error");
       } else {
+        toast("Member added.", "success");
         setNewMemberName("");
         setNewMemberPin("");
         setShowMemberModal(false);
@@ -208,11 +227,21 @@ export default function DashboardClient({
   };
 
   const handleDeleteMember = async (id: string) => {
-    if (!confirm("Are you sure you want to completely remove this member? This will wipe their chores forever.")) return;
-    startTransition(async () => {
-      const res = await deleteMemberAction(id);
-      if (res?.error) {
-        alert(res.error);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Remove Member",
+      message: "Are you sure you want to completely remove this member? This will wipe their chores forever.",
+      variant: "danger",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        startTransition(async () => {
+          const res = await deleteMemberAction(id);
+          if (res?.error) {
+            toast(res.error, "error");
+          } else {
+            toast("Member removed.", "success");
+          }
+        });
       }
     });
   };
@@ -223,25 +252,35 @@ export default function DashboardClient({
     startTransition(async () => {
       const res = await editMemberAction(editMemberId, editMemberName, editMemberPin === "" ? null : editMemberPin, editMemberOldPin);
       if (res?.error) {
-        alert(res.error);
+        toast(res.error, "error");
       } else {
+        toast("Member updated.", "success");
         setShowEditMemberModal(false);
       }
     });
   };
 
   const handleDeleteChoreDef = async (choreId: string) => {
-    if (!confirm("Are you sure you want to delete this chore template? All pending chores for this template will be removed.")) return;
-    startTransition(async () => {
-      const res = await deleteChoreDefinitionAction(choreId);
-      if (res?.error) alert(res.error);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Chore",
+      message: "Are you sure you want to delete this chore template? All pending chores for this template will be removed.",
+      variant: "danger",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        startTransition(async () => {
+          const res = await deleteChoreDefinitionAction(choreId);
+          if (res?.error) toast(res.error, "error");
+          else toast("Chore definition deleted.", "success");
+        });
+      }
     });
   };
 
   const handleAddChore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChoreName.trim() || newChoreEligible.length === 0) {
-      alert("Please enter a name and select at least one eligible member.");
+      toast("Please enter a name and select at least one eligible member.", "error");
       return;
     }
 
@@ -264,8 +303,9 @@ export default function DashboardClient({
       );
 
       if (res?.error) {
-        alert(res.error);
+        toast(res.error, "error");
       } else {
+        toast("Chore defined.", "success");
         setNewChoreName("");
         setNewChoreEligible([]);
         setNewChoreRotation("0");
@@ -404,6 +444,7 @@ export default function DashboardClient({
         {/* TAB: OVERVIEW */}
         {activeTab === 'overview' && (
           <>
+            {initialStats && <StatsBar stats={initialStats} />}
             {/* Section 1: Today's Chore Wheel & Rotation */}
             <section id="section-chores-wheel" className="space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-300 pb-4">
@@ -653,6 +694,10 @@ export default function DashboardClient({
               )}
             </div>
           </section>
+
+          {initialStats && initialStats.leaderboard && (
+            <Scoreboard leaderboard={initialStats.leaderboard} />
+          )}
         </>
         )}
 
@@ -1154,8 +1199,8 @@ export default function DashboardClient({
 
       {/* Edit Member Modal */}
       {showEditMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="skeuo-panel w-full max-w-md p-8 rounded-3xl shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowEditMemberModal(false); }}>
+          <div className="skeuo-panel w-full max-w-md p-8 rounded-3xl shadow-2xl relative">
             <h2 className="text-2xl font-black text-zinc-800 mb-2 uppercase tracking-tight">Edit Flatmate</h2>
             <p className="text-[10px] text-zinc-500 mb-8 uppercase tracking-widest font-bold">Update their name or PIN.</p>
             
@@ -1232,6 +1277,18 @@ export default function DashboardClient({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <ConfirmModal
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant={confirmDialog.variant}
+          isPending={isPending}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel || (() => setConfirmDialog(null))}
+        />
       )}
     </div>
   );

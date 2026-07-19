@@ -14,6 +14,7 @@ export async function loginAction(formData: FormData) {
   if (!flatId || !password) {
     return { error: "Flat ID and Password are required" };
   }
+  if (flatId.length > 30) return { error: "Flat ID is too long (max 30 characters)" };
 
   const supabase = await createClient();
   const hashed = hashPassword(password);
@@ -48,6 +49,7 @@ export async function registerAction(formData: FormData) {
   if (!flatId || !password || !confirmPassword) {
     return { error: "All fields are required" };
   }
+  if (flatId.length > 30) return { error: "Flat ID is too long (max 30 characters)" };
 
   if (password !== confirmPassword) {
     return { error: "Passwords do not match" };
@@ -137,6 +139,9 @@ export async function addMemberAction(name: string, pin: string | null = null) {
   if (!cleanName) {
     return { error: "Name is required" };
   }
+  if (cleanName.length > 15) {
+    return { error: "Name is too long (max 15 characters)" };
+  }
 
   const supabase = await createClient();
 
@@ -176,6 +181,9 @@ export async function editMemberAction(id: string, name: string, pin: string | n
   const cleanName = name.trim();
   if (!cleanName) {
     return { error: "Name is required" };
+  }
+  if (cleanName.length > 15) {
+    return { error: "Name is too long (max 15 characters)" };
   }
 
   const supabase = await createClient();
@@ -624,4 +632,67 @@ export async function votePresenceRequestAction(requestId: string) {
 
   revalidatePath("/dashboard");
   return { success: true, approved: newStatus === "approved" };
+}
+
+export async function getStatsAction() {
+  const cookieStore = await cookies();
+  const flatSession = cookieStore.get("flat_session")?.value;
+  if (!flatSession) return null;
+
+  const supabase = await createClient();
+
+  const { data: members } = await supabase
+    .from("members")
+    .select("id, name")
+    .eq("flat_id", flatSession);
+
+  if (!members) return null;
+
+  const { data: chores } = await supabase
+    .from("active_chores")
+    .select("id, assigned_member_id, state, created_at")
+    .eq("flat_id", flatSession);
+
+  if (!chores) return null;
+
+  const now = new Date();
+  const todayStr = now.toDateString();
+
+  let todayTotal = 0;
+  let todayCompleted = 0;
+  
+  const memberStats: Record<string, { id: string; name: string; completed: number; failed: number }> = {};
+  members.forEach(m => { memberStats[m.id] = { id: m.id, name: m.name, completed: 0, failed: 0 }; });
+
+  chores.forEach(chore => {
+    if (new Date(chore.created_at).toDateString() === todayStr) {
+      todayTotal++;
+      if (chore.state === "completed") todayCompleted++;
+    }
+    if (memberStats[chore.assigned_member_id]) {
+      if (chore.state === "completed") memberStats[chore.assigned_member_id].completed++;
+      else if (chore.state === "failed") memberStats[chore.assigned_member_id].failed++;
+    }
+  });
+
+  const leaderboard = Object.values(memberStats).sort((a, b) => {
+    if (b.completed !== a.completed) return b.completed - a.completed;
+    return a.failed - b.failed;
+  });
+
+  const failedChores = chores.filter(c => c.state === "failed").sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const lastFailureDate = failedChores.length > 0 ? new Date(failedChores[0].created_at) : new Date(0);
+  
+  const successfulDays = new Set<string>();
+  chores.forEach(c => {
+    if (new Date(c.created_at) > lastFailureDate && c.state === "completed") {
+      successfulDays.add(new Date(c.created_at).toDateString());
+    }
+  });
+
+  return {
+    today: { completed: todayCompleted, total: todayTotal },
+    streak: successfulDays.size,
+    leaderboard
+  };
 }

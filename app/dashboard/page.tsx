@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../utils/supabase/server";
+import { getStatsAction } from "../actions";
 import DashboardClient from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -49,10 +50,15 @@ export default async function DashboardPage() {
     .order("name", { ascending: true });
 
   // Fetch active chores (today's chores)
-  const { data: activeChores } = await supabase
+  const { data: rawActiveChores } = await supabase
     .from("active_chores")
     .select("*")
     .eq("flat_id", flatSession);
+
+  const activeChores = rawActiveChores?.map(ac => {
+    const def = chores?.find(c => c.id === ac.chore_definition_id);
+    return { ...ac, name: def?.name || "Unknown Chore" };
+  });
 
   // Fetch pending presence requests
   const { data: presenceRequests } = await supabase
@@ -60,6 +66,8 @@ export default async function DashboardPage() {
     .select("*")
     .eq("flat_id", flatSession)
     .eq("status", "pending");
+
+  const stats = await getStatsAction();
 
   return (
     <DashboardClient
@@ -69,6 +77,7 @@ export default async function DashboardPage() {
       initialChores={chores || []}
       initialActiveChores={activeChores || []}
       initialPresenceRequests={presenceRequests || []}
+      initialStats={stats}
     />
   );
 }
