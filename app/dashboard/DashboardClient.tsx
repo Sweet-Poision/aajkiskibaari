@@ -97,6 +97,7 @@ export default function DashboardClient({
     title: string;
     message: string;
     onConfirm: () => void;
+    onCancel?: () => void;
     variant?: "danger" | "warning";
   } | null>(null);
 
