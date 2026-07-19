@@ -328,10 +328,10 @@ export default function DashboardClient({
   };
 
   return (
-    <div className={`flex flex-col min-h-screen bg-transparent transition-colors duration-200 ${isPending ? "opacity-75" : ""}`}>
+    <div className={`flex flex-col min-h-screen bg-transparent transition-colors duration-200`}>
       
       {/* Header Banner */}
-      <header className="sticky top-0 z-40 w-full skeuo-panel rounded-none border-x-0 border-t-0 shadow-md px-6 py-4">
+      <header className="w-full skeuo-panel rounded-none border-x-0 border-t-0 shadow-md px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           
           {/* Logo */}
@@ -402,7 +402,7 @@ export default function DashboardClient({
       </header>
 
       {/* Tab Navigation */}
-      <div className="w-full bg-zinc-300 border-b border-zinc-400 shadow-inner sticky top-[73px] z-30 pt-2 px-4">
+      <div className="w-full bg-zinc-300 border-b border-zinc-400 shadow-inner pt-2 px-4 relative z-30">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex space-x-2">
             <button
@@ -958,8 +958,8 @@ export default function DashboardClient({
 
       {/* Modal: Add Member */}
       {showMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="skeuo-panel w-full max-w-md p-8 rounded-3xl shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="skeuo-panel w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-2xl my-4 sm:my-auto">
             <h2 className="text-2xl font-black text-zinc-800 mb-6 uppercase tracking-tight">Add Flat Member</h2>
             <form onSubmit={handleAddMember}>
               <div className="space-y-6 mb-8">
@@ -1023,8 +1023,8 @@ export default function DashboardClient({
 
       {/* Modal: Define Chore */}
       {showChoreModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
-          <div className="skeuo-panel w-full max-w-md p-8 rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="skeuo-panel w-full max-w-md p-6 sm:p-8 rounded-3xl shadow-2xl my-4 sm:my-auto">
             <h2 className="text-2xl font-black text-zinc-800 mb-6 uppercase tracking-tight">Define Chore</h2>
             <form onSubmit={handleAddChore}>
               <div className="space-y-6 mb-8">

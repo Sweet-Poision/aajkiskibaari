@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aaj Kiski Bari? - Flat Chore Manager",
-  description: "Who's got the chore today? Manage your flat chores, presence status, and vote on updates in real-time.",
+  title: "AAJKISKIBARI",
+  description: "Flat chore rotation and presence management.",
 };
 
 export default function RootLayout({
