@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState, useEffect } from "react";
+import React, { useTransition, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { selectProfileAction, addMemberAction, deleteMemberAction, editMemberAction } from "../actions";
 import { useToast } from "../components/Toast";
@@ -34,10 +34,13 @@ export default function ProfilesClient({
 }: ProfilesClientProps) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   
-  // Sync state with server prop in case of external router.refresh()
-  useEffect(() => {
+  // Sync local state when server re-fetches (e.g. after router.refresh())
+  // Using a ref comparison avoids the setState-in-effect lint violation
+  const prevMembersRef = useRef(initialMembers);
+  if (prevMembersRef.current !== initialMembers) {
+    prevMembersRef.current = initialMembers;
     setMembers(initialMembers);
-  }, [initialMembers]);
+  }
   
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
